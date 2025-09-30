@@ -93,7 +93,7 @@ const controlRecipe = async () => {
             clearLoader();
             recipeView.renderRecipe(
                 state.recipe,
-                state.likes.isLiked(id)
+                state.likes ? state.likes.isLiked(id) : false
             );
 
         } catch (err) {

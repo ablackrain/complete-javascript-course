@@ -1,6 +1,7 @@
 const fs = require('fs');
 const http = require('http');
 const url = require('url');
+const path = require('path');
 
 const json = fs.readFileSync(`${__dirname}/data/data.json`, 'utf-8');
 const laptopData = JSON.parse(json);
@@ -42,8 +43,24 @@ const server = http.createServer((req, res) => {
     
     // IMAGES
     else if ((/\.(jpg|jpeg|png|gif)$/i).test(pathName)) {
-        fs.readFile(`${__dirname}/data/img${pathName}`, (err, data) => {
-            res.writeHead(200, { 'Content-type': 'image/jpg'});
+        const imagesDir = path.join(__dirname, 'data', 'img');
+        const requested = path.normalize(pathName).replace(/^\/+/, '');
+        const safePath = path.join(imagesDir, requested);
+        const relative = path.relative(imagesDir, safePath);
+        if (relative.startsWith('..') || path.isAbsolute(relative)) {
+            res.writeHead(400, { 'Content-type': 'text/html' });
+            return res.end('Bad Request');
+        }
+
+        const ext = path.extname(safePath).toLowerCase();
+        const mime = ext === '.png' ? 'image/png' : ext === '.gif' ? 'image/gif' : 'image/jpeg';
+
+        fs.readFile(safePath, (err, data) => {
+            if (err) {
+                res.writeHead(404, { 'Content-type': 'text/html'});
+                return res.end('Image not found');
+            }
+            res.writeHead(200, { 'Content-type': mime });
             res.end(data);
         });
     }

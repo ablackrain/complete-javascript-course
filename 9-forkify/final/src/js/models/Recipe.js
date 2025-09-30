@@ -50,19 +50,33 @@ export default class Recipe {
             const arrIng = ingredient.split(' ');
             const unitIndex = arrIng.findIndex(el2 => units.includes(el2));
 
+            // Helper to safely parse a numeric quantity without using eval
+            const parseCountTokens = (tokens) => {
+                // Replace hyphens used as mixed-number separators with spaces and flatten
+                const flattened = tokens.join(' ').replace(/-/g, ' ').trim().split(/\s+/);
+                let sum = 0;
+                flattened.forEach(t => {
+                    if (!t) return;
+                    if (t.includes('/')) {
+                        const [num, den] = t.split('/').map(Number);
+                        if (!isNaN(num) && !isNaN(den) && den !== 0) {
+                            sum += num / den;
+                        }
+                    } else {
+                        const n = parseFloat(t);
+                        if (!isNaN(n)) sum += n;
+                    }
+                });
+                return sum;
+            };
+
             let objIng;
             if (unitIndex > -1) {
                 // There is a unit
                 // Ex. 4 1/2 cups, arrCount is [4, 1/2] --> eval("4+1/2") --> 4.5
                 // Ex. 4 cups, arrCount is [4]
                 const arrCount = arrIng.slice(0, unitIndex);
-                
-                let count;
-                if (arrCount.length === 1) {
-                    count = eval(arrIng[0].replace('-', '+'));
-                } else {
-                    count = eval(arrIng.slice(0, unitIndex).join('+'));
-                }
+                const count = parseCountTokens(arrCount) || 1;
 
                 objIng = {
                     count,
@@ -70,12 +84,20 @@ export default class Recipe {
                     ingredient: arrIng.slice(unitIndex + 1).join(' ')
                 };
 
-            } else if (parseInt(arrIng[0], 10)) {
-                // There is NO unit, but 1st element is number
+            } else if (parseFloat(arrIng[0])) {
+                // There is NO unit, but 1st element is a number or fraction/mixed number
+                // Collect leading numeric/fraction tokens
+                const leadingTokens = [];
+                for (let i = 0; i < arrIng.length; i++) {
+                    const token = arrIng[i];
+                    const looksNumeric = /^(\d+([.,]\d+)?|\d+\/\d+|\d+-\d+\/\d+)$/.test(token);
+                    if (looksNumeric) leadingTokens.push(token); else break;
+                }
+                const count = parseCountTokens(leadingTokens) || 1;
                 objIng = {
-                    count: parseInt(arrIng[0], 10),
+                    count,
                     unit: '',
-                    ingredient: arrIng.slice(1).join(' ')
+                    ingredient: arrIng.slice(leadingTokens.length).join(' ')
                 }
             } else if (unitIndex === -1) {
                 // There is NO unit and NO number in 1st position
